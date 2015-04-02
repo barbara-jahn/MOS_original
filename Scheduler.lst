@@ -1,0 +1,896 @@
+
+******************************************************************
+******************************************************************
+
+DOWNLOADED FROM MINLP CYBER-INFRASTRUCTURE 
+www.minlp.org
+
+PROBLEM : Crude-oil Operations Scheduling
+
+AUTHOR(S) : Sylvain Mouret, Ignacio Grossmann
+
+SUBMITTED BY : Sylvain Mouret
+
+******************************************************************
+******************************************************************GAMS Rev 228  x86/Linux                                                                            11/21/10 06:11:46 Page 1
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+   3   
+   4  *** Sets declaration
+   5  Sets
+   6          i       slots           / i1*i10 /
+   7          v       operations
+   8          p       products
+   9          r       inventory resources
+  10          k       properties
+  11          vs      sets of operations
+  12  ;
+  13  Alias (i,j,i1,i2);
+  14  Alias (v,w,v1,v2);
+  15  Alias (vs,vs1,vs2,vs3);
+  16  Sets
+  17          ORD2(i,j)               ordered slots (i <= j)
+  18          VSET(vs,v)              sets of operations membership
+  19          CLIQUE(vs)              clique sets
+  20          CLIQUE2(v,w)            clique sets of two operations
+  21          SETREQPREC1(vs)
+  22          SETREQPREC1ANTECEDENT(vs,v)
+  23          SETREQPREC1SUBSEQUENT(vs,v)
+  24          IN(v,r)                         inventory inlet operations
+  25          OUT(v,r)                        inventory outlet operations
+  26  ;
+  27   
+  28  *** Parameters declaration
+  29  Parameters
+  30           H
+  31           minS(v)
+  32           maxS(v)
+  33           minD(v)
+  34           maxD(v)
+  35           minE(v)
+  36           maxE(v)
+  37           minVT(v)
+  38           maxVT(v)
+  39           minB(v)
+  40           maxB(v)
+  41           minCT(r)
+  42           maxCT(r)
+  43           iniCT(r)
+  44           iniCP(r,p)
+  45           minFR(v)
+  46           maxFR(v)
+  47           totD(vs)
+  48           minDem(vs)
+  49           maxDem(vs)
+  50           val(v,p)
+  51           prop(p,k)
+  52           minProp(v,k)
+  53           maxProp(v,k)
+  54           maxE(v)
+  55           minN(vs)
+  56           maxN(vs)
+  57           minN1(vs)
+  58           maxN1(vs)
+  59  ;
+  60   
+  61  *** Variables declaration
+  62  Variable                 OBJ;
+  63  Binary Variable          Z(i,v);
+  64  Positive Variables       S(i,v), D(i,v), E(i,v);
+  65  Positive Variables       VT(i,v), VP(i,v,p);
+  66  Positive Variables       LT(i,r), LP(i,r,p);
+  67   
+  68  *** Constraints declaration
+  69  Equations
+  70           Objective
+  71   
+  72           MinAssignment
+  73           MOSAssignment
+  74   
+  75           MinCard
+GAMS Rev 228  x86/Linux                                                                            11/21/10 06:11:46 Page 2
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+  76           MaxCard
+  77           MinCard1
+  78           MaxCard1
+  79   
+  80           SetReqPrec1Time
+  81           SSTSetReqPrec1
+  82   
+  83           Time
+  84           MinStart
+  85           MaxEnd
+  86           MinVolumeTotal
+  87           MaxVolumeTotal
+  88           VolumeCompo
+  89           MinLevelTotal
+  90           MaxLevelTotal
+  91           MinLevelProduct
+  92           MaxLevelProduct
+  93           LevelCompo
+  94   
+  95           LevelTotalDef
+  96           LevelProdDef
+  97           CompositionCst
+  98   
+  99           MinFlowrate
+ 100           MaxFlowrate
+ 101   
+ 102           TotalDuration
+ 103   
+ 104           MinDemand
+ 105           MaxDemand
+ 106   
+ 107           MinProperty
+ 108           MaxProperty
+ 109   
+ 110           MinEndLevelTotal
+ 111           MaxEndLevelTotal
+ 112           MinEndLevelProduct
+ 113           MaxEndLevelProduct
+ 114   
+ 115           NoOverlapClique
+ 116   
+ 117           SBClique2
+ 118  ;
+ 119   
+ 120  *** Constraints construction
+ 121  Objective..
+ 122           OBJ =E= Sum((i,v,p), val(v,p) * VP(i,v,p)) ;
+ 123   
+ 124  MinAssignment(i)..
+ 125           Sum(v, Z(i,v)) =G= 1 ;
+ 126  MOSAssignment(i,vs)$CLIQUE(vs)..
+ 127           Sum(v$VSET(vs,v), Z(i,v)) =L= 1 ;
+ 128   
+ 129  Mincard(vs)$(minN(vs)>0)..
+ 130           Sum((i,v)$VSET(vs,v), Z(i,v)) =G= minN(vs) ;
+ 131  MaxCard(vs)$(maxN(vs)<INF)..
+ 132           Sum((i,v)$VSET(vs,v), Z(i,v)) =L= maxN(vs) ;
+ 133  Mincard1(i,vs)$(ord(i)=1 And minN1(vs)>0)..
+ 134           Sum(v$VSET(vs,v), Z(i,v)) =G= minN1(vs) ;
+ 135  MaxCard1(i,vs)$(ord(i)=1 And maxN1(vs)<INF)..
+ 136           Sum(v$VSET(vs,v), Z(i,v)) =L= maxN1(vs) ;
+ 137   
+ 138  SetReqPrec1Time(vs)$SETREQPREC1(vs)..
+ 139           Sum((i,v)$SETREQPREC1ANTECEDENT(vs,v), E(i,v)) =L= Sum((i,v)$SETREQPREC1SUBSEQUENT(vs,v), S(i,v)) ;
+ 140  SSTSetReqPrec1(i,vs)$SETREQPREC1(vs)..
+ 141           Sum((j,v)$(SETREQPREC1ANTECEDENT(vs,v) And ORD2(j+1,i)), Z(j,v)) =G= Sum((j,v)$(SETREQPREC1SUBSEQUENT(vs,v) 
+      And ORD2(j,i)), Z(j,v)) ;
+ 142   
+ 143  Time(i,v)..
+ 144           E(i,v) =E= S(i,v) + D(i,v) ;
+ 145  MinStart(i,v)..
+ 146           S(i,v) =G= minS(v) * Z(i,v) ;
+ 147  MaxEnd(i,v)..
+GAMS Rev 228  x86/Linux                                                                            11/21/10 06:11:46 Page 3
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+ 148           E(i,v) =L= maxE(v) * Z(i,v) ;
+ 149  MinVolumeTotal(i,v)$(minVT(v)>0)..
+ 150           VT(i,v) =G= minVT(v) * Z(i,v) ;
+ 151  MaxVolumeTotal(i,v)$(maxVT(v)<INF)..
+ 152           VT(i,v) =L= maxVT(v) * Z(i,v) ;
+ 153  VolumeCompo(i,v)..
+ 154           VT(i,v) =E= Sum(p, VP(i,v,p)) ;
+ 155  MinLevelTotal(i,r)$(minCT(r)>0)..
+ 156           LT(i,r) =G= minCT(r) ;
+ 157  MaxLevelTotal(i,r)$(maxCT(r)<INF)..
+ 158           LT(i,r) =L= maxCT(r) ;
+ 159  MinLevelProduct(i,r,p)..
+ 160           LP(i,r,p) =G= 0 ;
+ 161  MaxLevelProduct(i,r,p)$(maxCT(r)<INF)..
+ 162           LP(i,r,p) =L= maxCT(r) ;
+ 163  LevelCompo(i,r)..
+ 164           LT(i,r) =E= Sum(p, LP(i,r,p)) ;
+ 165   
+ 166  LevelTotalDef(i,r)..
+ 167           LT(i,r) =E= iniCT(r) + Sum((j,v)$(ORD2(j+1,i) And IN(v,r)), VT(j,v)) - Sum((j,v)$(ORD2(j+1,i) And OUT(v,r)),
+       VT(j,v)) ;
+ 168  LevelProdDef(i,r,p)..
+ 169           LP(i,r,p) =E= iniCP(r,p) + Sum((j,v)$(ORD2(j+1,i) And IN(v,r)), VP(j,v,p)) - Sum((j,v)$(ORD2(j+1,i) And OUT(
+      v,r)), VP(j,v,p)) ;
+ 170  CompositionCst(i,r,v,p)$OUT(v,r)..
+ 171           VT(i,v) * LP(i,r,p) =E= VP(i,v,p) * LT(i,r) ;
+ 172   
+ 173  MinFlowrate(i,v)..
+ 174           VT(i,v) =G= minFR(v) * D(i,v) ;
+ 175  MaxFlowrate(i,v)..
+ 176           VT(i,v) =L= maxFR(v) * D(i,v) ;
+ 177   
+ 178  TotalDuration(vs)$(totD(vs)>0 And totD(vs)<INF)..
+ 179           Sum((i,v)$VSET(vs,v), D(i,v)) =E= totD(vs) ;
+ 180   
+ 181  MinDemand(vs)$(minDem(vs)>0)..
+ 182           Sum((i,v)$VSET(vs,v), VT(i,v)) =G= minDem(vs) ;
+ 183  MaxDemand(vs)$(maxDem(vs)>0 And maxDem(vs)<INF)..
+ 184           Sum((i,v)$VSET(vs,v), VT(i,v)) =L= maxDem(vs) ;
+ 185   
+ 186  MinProperty(i,v,k)$(minProp(v,k)>-INF)..
+ 187           Sum(p, prop(p,k) * VP(i,v,p)) =G= minProp(v,k) * VT(i,v) ;
+ 188  MaxProperty(i,v,k)$(maxProp(v,k)<INF)..
+ 189           Sum(p, prop(p,k) * VP(i,v,p)) =L= maxProp(v,k) * VT(i,v) ;
+ 190   
+ 191  MinEndLevelTotal(r)..
+ 192           iniCT(r) + Sum((i,v)$IN(v,r), VT(i,v)) - Sum((i,v)$OUT(v,r), VT(i,v)) =G= minCT(r);
+ 193  MaxEndLevelTotal(r)$(maxCT(r)<INF)..
+ 194           iniCT(r) + Sum((i,v)$IN(v,r), VT(i,v)) - Sum((i,v)$OUT(v,r), VT(i,v)) =L= maxCT(r);
+ 195  MinEndLevelProduct(r,p)..
+ 196           iniCP(r,p) + Sum((i,v)$IN(v,r), VP(i,v,p)) - Sum((i,v)$OUT(v,r), VP(i,v,p)) =G= 0;
+ 197  MaxEndLevelProduct(r,p)$(maxCT(r)<INF)..
+ 198           iniCP(r,p) + Sum((i,v)$IN(v,r), VP(i,v,p)) - Sum((i,v)$OUT(v,r), VP(i,v,p)) =L= maxCT(r);
+ 199   
+ 200  NoOverlapClique(i1,i2,vs)$(ORD2(i1+1,i2) And CLIQUE(vs))..
+ 201           Sum(v$VSET(vs,v), E(i1,v)) + Sum((i,v)$(VSET(vs,v) And ord(i1)<ord(i) And ord(i)<ord(i2)), D(i,v)) =L= Sum(v
+      $VSET(vs,v), S(i2,v)) + (smax(v$VSET(vs,v), maxE(v))) * (1 - Sum(v$VSET(vs,v), Z(i2,v))) ;
+ 202   
+ 203  SBClique2(i-1,v)..
+ 204           Z(i,v) =L= Sum(w$(CLIQUE2(v,w) And ord(v)<>ord(w)), Z(i-1,w)) ;
+ 205   
+ 206   
+ 207  *** Problem parameters
+INCLUDE    /home/smouret/minlp.org/LeeCrudeOil1.gms
+ 210   
+ 211  *** Generic
+ 212  Set v / v1*v8 /;
+ 213  Set p / p1*p4 /;
+ 214  Set r / r1*r7 /;
+ 215  Set k / k1 /;
+ 216  Set vs /
+ 217          vs1, vs2, vs7, vs8
+ 218          vs12, vs13, vs14, vs25, vs26, vs37, vs48, vs57, vs68, vs78
+GAMS Rev 228  x86/Linux                                                                            11/21/10 06:11:46 Page 4
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+ 219  /;
+ 220   
+ 221  * Set membership
+ 222  Set VSET(vs,v) /
+ 223          vs1.v1
+ 224          vs2.v2
+ 225          vs7.v7
+ 226          vs8.v8
+ 227          vs12.(v1,v2)
+ 228          vs13.(v1,v3)
+ 229          vs14.(v1,v4)
+ 230          vs25.(v2,v5)
+ 231          vs26.(v2,v6)
+ 232          vs37.(v3,v7)
+ 233          vs48.(v4,v8)
+ 234          vs57.(v5,v7)
+ 235          vs68.(v6,v8)
+ 236          vs78.(v7,v8)
+ 237  /;
+ 238   
+ 239  *** Specific
+ 240  Sets
+ 241          VESSEL(r)       Vessels         / r1*r2 /
+ 242          STOR(r)         Storage tanks   / r3*r4 /
+ 243          CHARG(r)        Charging tanks  / r5*r6 /
+ 244          CDU(r)          CDUs            / r7 /
+ 245  ;
+ 246   
+ 247  Sets
+ 248          UNLOAD(v)       Unloadings      / v1*v2 /
+ 249          TRANSF(v)       Transfers       / v3*v6 /
+ 250          DISTIL(v)       Distillations   / v7*v8 /
+ 251  ;
+ 252   
+ 253  *** Generic
+ 254   
+ 255  * inputs/outputs
+ 256  Sets
+ 257  IN(v,r)         / v1.r3, v2.r4, v3.r5, v4.r6, v5.r5, v6.r6, v7.r7, v8.r7 /
+ 258  OUT(v,r)        / v1.r1, v2.r2, v3.r3, v4.r3, v5.r4, v6.r4, v7.r5, v8.r6 /
+ 259  ;
+ 260   
+ 261  * Required precedences
+ 262  SETREQPREC1('vs12') = yes ;
+ 263  SETREQPREC1ANTECEDENT('vs12','v1') = yes ;
+ 264  SETREQPREC1SUBSEQUENT('vs12','v2') = yes ;
+ 265   
+ 266  * Non-overlapping cliques
+ 267  Set CLIQUE(vs) /
+ 268          vs12
+ 269          vs13
+ 270          vs14
+ 271          vs25
+ 272          vs26
+ 273          vs37
+ 274          vs48
+ 275          vs57
+ 276          vs68
+ 277          vs78
+ 278  /;
+ 279   
+ 280  * Scheduling horizon
+ 281  H = 8;
+ 282   
+ 283  * Cardinality
+ 284  minN(vs) = 0;
+ 285  maxN(vs) = INF;
+ 286  minN('vs1') = 1;
+ 287  maxN('vs1') = 1;
+ 288  minN('vs2') = 1;
+ 289  maxN('vs2') = 1;
+ 290  minN('vs78') = 3;
+ 291  maxN('vs78') = 3;
+GAMS Rev 228  x86/Linux                                                                            11/21/10 06:11:46 Page 5
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+ 292  minN('vs7') = 1;
+ 293  maxN('vs7') = 2;
+ 294  minN('vs8') = 1;
+ 295  maxN('vs8') = 2;
+ 296   
+ 297  * First slot cardinality
+ 298  minN1(vs) = 0;
+ 299  maxN1(vs) = INF;
+ 300  minN1('vs78') = 1;
+ 301  maxN1('vs78') = 1;
+ 302   
+ 303  * Initial inventory
+ 304  Parameter iniCP(r,p) /
+ 305          r1.p1 100
+ 306          r2.p2 100
+ 307          r3.p1  25
+ 308          r4.p2  75
+ 309          r5.p3  50
+ 310          r6.p4  50
+ 311  /;
+ 312  iniCT(r) = Sum(p, iniCP(r,p));
+ 313   
+ 314  * Minimum inventory
+ 315  minCT(r) = 0;
+ 316   
+ 317  * Maximum inventory
+ 318  maxCT(r) = 100;
+ 319  maxCT(r)$CDU(r) = INF;
+ 320   
+ 321  * Minimum start time
+ 322  minS(v) = 0;
+ 323  minS('v2') = 4;
+ 324   
+ 325  * Maximum start time
+ 326  maxS(v) = H;
+ 327   
+ 328  * Minimum duration
+ 329  minD(v) = 0;
+ 330   
+ 331  * Maximum duration
+ 332  maxD(v) = H;
+ 333   
+ 334  * Minimum end time
+ 335  minE(v) = 0;
+ 336   
+ 337  * Maximum end time
+ 338  maxE(v) = H;
+ 339   
+ 340  * Minimum total volume
+ 341  minVT(v) = 0;
+ 342  Loop((v,r)$(UNLOAD(v) And OUT(v,r)),
+ 343          minVT(v) = iniCT(r);
+ 344  );
+ 345   
+ 346  * Maximum total volume
+ 347  maxVT(v) = 100;
+ 348   
+ 349  * Minimum flowrate
+ 350  minFR(v) = 0;
+ 351  minFR(v)$DISTIL(v) = 5;
+ 352   
+ 353  * Maximum flowrate
+ 354  maxFR(v) = 50;
+ 355   
+ 356  * Minimum duration for unloadings
+ 357  Loop((v,r)$(UNLOAD(v) And OUT(v,r)),
+ 358          minD(v)$UNLOAD(v) = iniCT(r) / maxFR(v);
+ 359  );
+ 360   
+ 361  * Total duration
+ 362  totD(vs) = 0;
+ 363  totD('vs78') = H;
+ 364   
+GAMS Rev 228  x86/Linux                                                                            11/21/10 06:11:46 Page 6
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+ 365  * Minimum demand
+ 366  minDem(vs) = 0;
+ 367  minDem('vs7') = 100;
+ 368  minDem('vs8') = 100;
+ 369   
+ 370  * Maximum demand
+ 371  maxDem(vs) = INF;
+ 372  maxDem('vs7') = 100;
+ 373  maxDem('vs8') = 100;
+ 374   
+ 375  * Product value
+ 376  val(v,p) = 0;
+ 377  val(v,'p1')$DISTIL(v) = 0.1;
+ 378  val(v,'p2')$DISTIL(v) = 0.6;
+ 379  val(v,'p3')$DISTIL(v) = 0.2;
+ 380  val(v,'p4')$DISTIL(v) = 0.5;
+ 381   
+ 382  * Product properties
+ 383  Parameter prop(p,k) /
+ 384          p1.k1 0.1
+ 385          p2.k1 0.6
+ 386          p3.k1 0.2
+ 387          p4.k1 0.5
+ 388  /;
+ 389   
+ 390  * Minimum operation property
+ 391  minProp(v,k) = -INF;
+ 392  Loop(v$(DISTIL(v) And OUT(v,'r5')), minProp(v,'k1') = 0.15; );
+ 393  Loop(v$(DISTIL(v) And OUT(v,'r6')), minProp(v,'k1') = 0.45; );
+ 394   
+ 395  * Maximum operation property
+ 396  maxProp(v,k) = INF;
+ 397  Loop(v$(DISTIL(v) And OUT(v,'r5')), maxProp(v,'k1') = 0.25; );
+ 398  Loop(v$(DISTIL(v) And OUT(v,'r6')), maxProp(v,'k1') = 0.55; );
+ 399   
+ 400   
+ 401   
+ 402  *** Model declaration
+ 403  Model MOS /
+ 404          Objective
+ 405   
+ 406  *        MinAssignment
+ 407          MOSAssignment
+ 408   
+ 409          MinCard
+ 410          MaxCard
+ 411          MinCard1
+ 412          MaxCard1
+ 413   
+ 414          SetReqPrec1Time
+ 415          SSTSetReqPrec1
+ 416   
+ 417          Time
+ 418          MinStart
+ 419          MaxEnd
+ 420          MinVolumeTotal
+ 421          MaxVolumeTotal
+ 422          VolumeCompo
+ 423          MinLevelTotal
+ 424          MaxLevelTotal
+ 425          MinLevelProduct
+ 426          MaxLevelProduct
+ 427          LevelCompo
+ 428   
+ 429          LevelTotalDef
+ 430          LevelProdDef
+ 431          CompositionCst
+ 432   
+ 433          MinFlowrate
+ 434          MaxFlowrate
+ 435   
+ 436          TotalDuration
+ 437   
+GAMS Rev 228  x86/Linux                                                                            11/21/10 06:11:46 Page 7
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+ 438          MinDemand
+ 439          MaxDemand
+ 440   
+ 441          MinProperty
+ 442          MaxProperty
+ 443   
+ 444          MinEndLevelTotal
+ 445          MaxEndLevelTotal
+ 446          MinEndLevelProduct
+ 447          MaxEndLevelProduct
+ 448   
+ 449          NoOverlapClique
+ 450   
+ 451          SBClique2
+ 452  /;
+ 453   
+ 454  Model MOSMILP /
+ 455          Objective
+ 456   
+ 457  *        MinAssignment
+ 458          MOSAssignment
+ 459   
+ 460          MinCard
+ 461          MaxCard
+ 462          MinCard1
+ 463          MaxCard1
+ 464   
+ 465          SetReqPrec1Time
+ 466          SSTSetReqPrec1
+ 467   
+ 468          Time
+ 469          MinStart
+ 470          MaxEnd
+ 471          MinVolumeTotal
+ 472          MaxVolumeTotal
+ 473          VolumeCompo
+ 474          MinLevelTotal
+ 475          MaxLevelTotal
+ 476          MinLevelProduct
+ 477          MaxLevelProduct
+ 478          LevelCompo
+ 479   
+ 480          LevelTotalDef
+ 481          LevelProdDef
+ 482  *       CompositionCst
+ 483   
+ 484          MinFlowrate
+ 485          MaxFlowrate
+ 486   
+ 487          TotalDuration
+ 488   
+ 489          MinDemand
+ 490          MaxDemand
+ 491   
+ 492          MinProperty
+ 493          MaxProperty
+ 494   
+ 495          MinEndLevelTotal
+ 496          MaxEndLevelTotal
+ 497          MinEndLevelProduct
+ 498          MaxEndLevelProduct
+ 499   
+ 500          NoOverlapClique
+ 501   
+ 502          SBClique2
+ 503  /;
+ 504   
+ 505  *** Sets construction
+ 506  ORD2(i,j)$(ord(i) <= ord(j)) = yes ;
+ 507  Loop(vs$CLIQUE(vs),
+ 508          CLIQUE2(v,w)$(VSET(vs,v) and VSET(vs,w) and ord(v)<>ord(w)) = yes;
+ 509  );
+ 510   
+GAMS Rev 228  x86/Linux                                                                            11/21/10 06:11:46 Page 8
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+C o m p i l a t i o n
+
+
+ 511  *** Options
+ 512  Option optcr = 0 ;
+ 513  Option iterlim = 999999999 ;
+ 514  Option reslim = 300 ;
+ 515  Option limcol = 0;
+ 516  Option limrow = 0;
+ 517  Option solprint = off;
+ 518   
+ 519   
+ 520  *** Solve using MINLP
+ 523  Solve MOSMILP using MIP maximizing OBJ ;
+ 524  Z.fx(i,v) = Z.l(i,v);
+ 525  Solve MOS using RMINLP maximizing OBJ ;
+ 526   
+ 527   
+ 529  Display OBJ.l, Z.l, S.l, D.l, E.l, VT.l, VP.l, LT.l, LP.l;
+GAMS Rev 228  x86/Linux                                                                            11/21/10 06:11:46 Page 9
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Unique Element Listing
+
+
+Unique Elements in Entry Order
+
+ 1  i1          i2          i3          i4          i5          i6          i7          i8          i9          i10       
+11  v1          v2          v3          v4          v5          v6          v7          v8          p1          p2        
+21  p3          p4          r1          r2          r3          r4          r5          r6          r7          k1        
+31  vs1         vs2         vs7         vs8         vs12        vs13        vs14        vs25        vs26        vs37      
+41  vs48        vs57        vs68        vs78      
+
+Unique Elements in Sorted Order
+
+ 1  i1          i10         i2          i3          i4          i5          i6          i7          i8          i9        
+11  k1          p1          p2          p3          p4          r1          r2          r3          r4          r5        
+21  r6          r7          v1          v2          v3          v4          v5          v6          v7          v8        
+31  vs1         vs12        vs13        vs14        vs2         vs25        vs26        vs37        vs48        vs57      
+41  vs68        vs7         vs78        vs8       
+GAMS Rev 228  x86/Linux                                                                           11/21/10 06:11:46 Page 10
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Include File Summary
+
+
+   SEQ   GLOBAL TYPE      PARENT   LOCAL  FILENAME
+
+     1        1 INPUT          0       0  /home/smouret/minlp.org/Scheduler.gms
+     2      208 INCLUDE        1     208  ./home/smouret/minlp.org/LeeCrudeOil1.gms
+
+
+COMPILATION TIME     =        0.006 SECONDS      3 Mb  LNX228-228 Jul 26, 2008
+GAMS Rev 228  x86/Linux                                                                           11/21/10 06:11:46 Page 11
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Model Statistics    SOLVE MOSMILP Using MIP From line 523
+
+
+MODEL STATISTICS
+
+BLOCKS OF EQUATIONS          34     SINGLE EQUATIONS        2,336
+BLOCKS OF VARIABLES           9     SINGLE VARIABLES        1,071
+NON ZERO ELEMENTS        13,867     DISCRETE VARIABLES         80
+
+
+GENERATION TIME      =        0.166 SECONDS      4 Mb  LNX228-228 Jul 26, 2008
+
+
+EXECUTION TIME       =        0.167 SECONDS      4 Mb  LNX228-228 Jul 26, 2008
+GAMS Rev 228  x86/Linux                                                                           11/21/10 06:11:46 Page 12
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Solution Report     SOLVE MOSMILP Using MIP From line 523
+
+
+               S O L V E      S U M M A R Y
+
+     MODEL   MOSMILP             OBJECTIVE  OBJ
+     TYPE    MIP                 DIRECTION  MAXIMIZE
+     SOLVER  CPLEX               FROM LINE  523
+
+**** SOLVER STATUS     1 NORMAL COMPLETION         
+**** MODEL STATUS      1 OPTIMAL                   
+**** OBJECTIVE VALUE               79.7500
+
+ RESOURCE USAGE, LIMIT          4.240       300.000
+ ITERATION COUNT, LIMIT     25006     999999999
+
+ILOG CPLEX       Aug  1, 2008 22.8.1 LNX 5924.6015 LX3 x86/Linux
+Cplex 11.1.1, GAMS Link 34 
+Cplex licensed for 1 use of lp, qp, mip and barrier, with 4 parallel threads.
+
+MIP status(101): integer optimal solution
+Fixed MIP status(1): optimal
+Proven optimal solution.
+
+MIP Solution:           79.750000    (24961 iterations, 242 nodes)
+Final Solve:            79.750000    (45 iterations)
+
+Best possible:          79.750000
+Absolute gap:            0.000000
+Relative gap:            0.000000
+
+
+
+**** REPORT SUMMARY :        0     NONOPT
+                             0 INFEASIBLE
+                             0  UNBOUNDED
+GAMS Rev 228  x86/Linux                                                                           11/21/10 06:11:46 Page 13
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Model Statistics    SOLVE MOS Using RMINLP From line 525
+
+
+MODEL STATISTICS
+
+BLOCKS OF EQUATIONS          35     SINGLE EQUATIONS        2,656
+BLOCKS OF VARIABLES           9     SINGLE VARIABLES        1,071
+NON ZERO ELEMENTS        15,147     NON LINEAR N-Z          1,280
+DERIVATIVE POOL              10     CONSTANT POOL              16
+CODE LENGTH               6,081
+
+
+GENERATION TIME      =        0.074 SECONDS      3 Mb  LNX228-228 Jul 26, 2008
+
+
+EXECUTION TIME       =        0.079 SECONDS      3 Mb  LNX228-228 Jul 26, 2008
+GAMS Rev 228  x86/Linux                                                                           11/21/10 06:11:46 Page 14
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+Solution Report     SOLVE MOS Using RMINLP From line 525
+
+
+               S O L V E      S U M M A R Y
+
+     MODEL   MOS                 OBJECTIVE  OBJ
+     TYPE    RMINLP              DIRECTION  MAXIMIZE
+     SOLVER  CONOPT              FROM LINE  525
+
+**** SOLVER STATUS     1 NORMAL COMPLETION         
+**** MODEL STATUS      2 LOCALLY OPTIMAL           
+**** OBJECTIVE VALUE               79.7500
+
+ RESOURCE USAGE, LIMIT          0.040       300.000
+ ITERATION COUNT, LIMIT        40     999999999
+ EVALUATION ERRORS              0             0
+ 
+ 
+    C O N O P T 3   version 3.14S
+    Copyright (C)   ARKI Consulting and Development A/S
+                    Bagsvaerdvej 246 A
+                    DK-2880 Bagsvaerd, Denmark
+ 
+ Using default options.
+ 
+ 
+    The model has 1071 variables and 2656 constraints
+    with 15147 Jacobian elements, 1280 of which are nonlinear.
+    The Hessian of the Lagrangian has 0 elements on the diagonal,
+    640 elements below the diagonal, and 700 nonlinear variables.
+ 
+ ** Optimal solution. There are no superbasic variables.
+ 
+ 
+ CONOPT time Total                            0.052 seconds
+   of which: Function evaluations             0.001 =  1.7%
+             1st Derivative evaluations       0.001 =  1.9%
+ 
+ Workspace           =     9.55 Mbytes
+    Estimate         =     9.55 Mbytes
+    Max used         =     4.78 Mbytes
+
+
+**** REPORT SUMMARY :        0     NONOPT
+                             0 INFEASIBLE
+                             0  UNBOUNDED
+                             0     ERRORS
+GAMS Rev 228  x86/Linux                                                                           11/21/10 06:11:46 Page 15
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+E x e c u t i o n
+
+
+----    529 VARIABLE OBJ.L                 =       79.750  
+
+----    529 VARIABLE Z.L  
+
+             v1          v2          v3          v4          v5          v6          v7          v8
+
+i1                                                                    1.000       1.000
+i2                                1.000                   1.000                               1.000
+i3        1.000                                                       1.000
+i4                    1.000       1.000       1.000
+i5                                                                                1.000
+
+
+----    529 VARIABLE S.L  
+
+             v1          v2          v3          v4          v5          v6          v7          v8
+
+i2                                1.000                   1.000                               1.000
+i3        1.500                                                       5.890
+i4                    6.000       5.780       6.110
+i5                                                                                5.890
+
+
+----    529 VARIABLE D.L  
+
+             v1          v2          v3          v4          v5          v6          v7          v8
+
+i1                                                                    1.000       1.000
+i2                                0.500                   0.390                               4.890
+i3        2.000                                                       0.110
+i4                    2.000       0.110       1.890
+i5                                                                                2.110
+
+
+----    529 VARIABLE E.L  
+
+             v1          v2          v3          v4          v5          v6          v7          v8
+
+i1                                                                    1.000       1.000
+i2                                1.500                   1.390                               5.890
+i3        3.500                                                       6.000
+i4                    8.000       5.890       8.000
+i5                                                                                8.000
+
+
+----    529 VARIABLE VT.L  
+
+             v1          v2          v3          v4          v5          v6          v7          v8
+
+i1                                                                   50.000       5.000
+i2                               25.000                  19.500                             100.000
+i3      100.000                                                       5.500
+i4                  100.000       5.500      94.500
+i5                                                                               95.000
+
+
+----    529 VARIABLE VP.L  
+
+                p1          p2          p3          p4
+
+i1 .v6                  50.000
+i1 .v7                               5.000
+i2 .v3      25.000
+i2 .v5                  19.500
+i2 .v8                  50.000                  50.000
+i3 .v1     100.000
+i3 .v6                   5.500
+i4 .v2                 100.000
+i4 .v3       5.500
+i4 .v4      94.500
+i5 .v7      30.500      19.500      45.000
+
+GAMS Rev 228  x86/Linux                                                                           11/21/10 06:11:46 Page 16
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+E x e c u t i o n
+
+
+----    529 VARIABLE LT.L  
+
+             r1          r2          r3          r4          r5          r6          r7
+
+i1      100.000     100.000      25.000      75.000      50.000      50.000
+i2      100.000     100.000      25.000      25.000      45.000     100.000       5.000
+i3      100.000     100.000                   5.500      89.500                 105.000
+i4                  100.000     100.000                  89.500       5.500     105.000
+i5                                          100.000      95.000     100.000     105.000
+i6                                          100.000                 100.000     200.000
+i7                                          100.000                 100.000     200.000
+i8                                          100.000                 100.000     200.000
+i9                                          100.000                 100.000     200.000
+i10                                         100.000                 100.000     200.000
+
+
+----    529 VARIABLE LP.L  
+
+                p1          p2          p3          p4
+
+i1 .r1     100.000
+i1 .r2                 100.000
+i1 .r3      25.000
+i1 .r4                  75.000
+i1 .r5                              50.000
+i1 .r6                                          50.000
+i2 .r1     100.000
+i2 .r2                 100.000
+i2 .r3      25.000
+i2 .r4                  25.000
+i2 .r5                              45.000
+i2 .r6                  50.000                  50.000
+i2 .r7                               5.000
+i3 .r1     100.000
+i3 .r2                 100.000
+i3 .r4                   5.500
+i3 .r5      25.000      19.500      45.000
+i3 .r7                  50.000       5.000      50.000
+i4 .r2                 100.000
+i4 .r3     100.000
+i4 .r5      25.000      19.500      45.000
+i4 .r6                   5.500
+i4 .r7                  50.000       5.000      50.000
+i5 .r4                 100.000
+i5 .r5      30.500      19.500      45.000
+i5 .r6      94.500       5.500
+i5 .r7                  50.000       5.000      50.000
+i6 .r4                 100.000
+i6 .r6      94.500       5.500
+i6 .r7      30.500      69.500      50.000      50.000
+i7 .r4                 100.000
+i7 .r6      94.500       5.500
+i7 .r7      30.500      69.500      50.000      50.000
+i8 .r4                 100.000
+i8 .r6      94.500       5.500
+i8 .r7      30.500      69.500      50.000      50.000
+i9 .r4                 100.000
+i9 .r6      94.500       5.500
+i9 .r7      30.500      69.500      50.000      50.000
+i10.r4                 100.000
+i10.r6      94.500       5.500
+i10.r7      30.500      69.500      50.000      50.000
+
+
+
+EXECUTION TIME       =        0.004 SECONDS      3 Mb  LNX228-228 Jul 26, 2008
+GAMS Rev 228  x86/Linux                                                                           11/21/10 06:11:46 Page 17
+G e n e r a l   A l g e b r a i c   M o d e l i n g   S y s t e m
+E x e c u t i o n
+
+
+USER: Ignacio E. Grossmann                           G081003:1150AP-LNX
+      Carnegie Mellon University, Dept. of Chemical Engineering  DC2545
+      License for teaching and research at degree granting institutions
+
+
+**** FILE SUMMARY
+
+Input      /home/smouret/minlp.org/Scheduler.gms
+Output     /home/smouret/minlp.org/Scheduler.lst
